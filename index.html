@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEYSTROKE DEFENDER // Cyber Typing Core</title>
+    <meta name="description" content="A high-intensity, retro-futuristic CRT hacker console typing defense game. Protect the mainframe core from hostile data packets.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00ff66;       /* Retro Terminal Green */
+            --primary-dim: rgba(0, 255, 102, 0.4);
+            --primary-bg: rgba(0, 255, 102, 0.05);
+            --secondary: #00f0ff;     /* Cyber Cyan */
+            --secondary-dim: rgba(0, 240, 255, 0.4);
+            --accent: #bd00ff;        /* Cyber Purple */
+            --danger: #ff3366;        /* Neon Red */
+            --warning: #ffaa00;       /* Warning Amber */
+            --bg: #06080c;            /* Terminal Black */
+            --panel-bg: rgba(10, 14, 22, 0.88);
+            --border-glow: 0 0 10px rgba(0, 255, 102, 0.35);
+            --text-glow: 0 0 8px rgba(0, 255, 102, 0.6);
+            --cyan-glow: 0 0 12px rgba(0, 240, 255, 0.7);
+            --red-glow: 0 0 12px rgba(255, 51, 102, 0.7);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #030508;
+            background-image: radial-gradient(circle at center, #0d121d 0%, #030508 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--primary);
+            overflow: hidden;
+        }
+
+        /* Physical Monitor Frame */
+        .monitor-wrapper {
+            position: relative;
+            width: 95vw;
+            max-width: 1024px;
+            height: 90vh;
+            max-height: 800px;
+            background: linear-gradient(135deg, #1f2535 0%, #0d1017 100%);
+            border: 4px solid #07090d;
+            border-radius: 20px;
+            box-shadow: 
+                0 25px 60px rgba(0, 0, 0, 0.85),
+                inset 0 2px 3px rgba(255, 255, 255, 0.08),
+                inset 0 -3px 6px rgba(0, 0, 0, 0.6);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Outer Monitor Bezel Rim */
+        .monitor-wrapper::before {
+            content: " ";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 12px solid #161a25;
+            border-radius: 16px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Monitor Screen Area */
+        .monitor-screen {
+            position: relative;
+            flex: 1;
+            background: var(--bg);
+            border: 3px solid #030507;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.95);
+            animation: crt-flicker 0.15s infinite alternate;
+        }
+
+        /* CRT Screen Curved Glass Reflection & Vignette */
+        .monitor-screen::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: 
+                radial-gradient(circle, rgba(16, 35, 20, 0.08) 0%, rgba(0, 0, 0, 0.65) 100%),
+                linear-gradient(125deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 30%, transparent 31%);
+            z-index: 90;
+            pointer-events: none;
+        }
+
+        /* CRT Scanlines and Overlay Effects */
+        #crt-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.35) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 99;
+            pointer-events: none;
+        }
+
+        #crt-overlay::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                to bottom,
+                transparent 0%,
+                rgba(0, 255, 102, 0.06) 10%,
+                transparent 20%
+            );
+            animation: scanline-roll 12s infinite linear;
+            pointer-events: none;
+        }
+
+        /* Screen flash indicator for damage */
+        #flash-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--danger);
+            opacity: 0;
+            z-index: 98;
+            pointer-events: none;
+            transition: opacity 0.05s ease-out;
+        }
+
+        /* Game Main Layout Container */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            z-index: 2;
+        }
+
+        /* HUD dashboard style */
+        #hud {
+            display: grid;
+            grid-template-columns: 1.2fr 1.5fr 1fr 1.3fr 1fr;
+            gap: 15px;
+            padding: 16px 20px;
+            background: rgba(12, 17, 26, 0.95);
+            border-bottom: 2px solid var(--primary-dim);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.05rem;
+            align-items: center;
+            text-shadow: var(--text-glow);
+            letter-spacing: 1.5px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 5;
+        }
+
+        #hud div {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #hud span {
+            font-weight: bold;
+            color: var(--secondary);
+            text-shadow: var(--cyan-glow);
+        }
+
+        #hud-integrity {
+            font-family: monospace;
+            letter-spacing: 3px;
+            color: var(--primary) !important;
+            text-shadow: var(--text-glow) !important;
+            transition: color 0.2s, text-shadow 0.2s;
+        }
+
+        #hud-integrity.danger {
+            color: var(--danger) !important;
+            text-shadow: var(--red-glow) !important;
+            animation: hud-flash 0.6s infinite alternate;
+        }
+
+        /* Mute Button styling */
+        .mute-btn {
+            justify-self: end;
+            cursor: pointer;
+            padding: 6px 14px;
+            border: 1px solid var(--primary-dim);
+            background: var(--primary-bg);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-shadow: none !important;
+            color: var(--primary);
+        }
+
+        .mute-btn:hover {
+            background: rgba(0, 255, 102, 0.18);
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary-dim);
+            color: #fff;
+        }
+
+        /* Play Arena styling */
+        #arena {
+            flex: 1;
+            position: relative;
+            background-color: #05070a;
+            background-image: 
+                linear-gradient(rgba(0, 255, 102, 0.02) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(0, 255, 102, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            overflow: hidden;
+            border-bottom: 1px solid rgba(0, 255, 102, 0.15);
+        }
+
+        /* Firewall Core bottom border */
+        #arena::before {
+            content: " ";
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 6px;
+            background: var(--primary);
+            box-shadow: 0 -2px 12px var(--primary);
+            z-index: 3;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+
+        /* Red firewall glow when integrity is dangerous */
+        #arena.danger::before {
+            background: var(--danger);
+            box-shadow: 0 -2px 15px var(--danger);
+            animation: firewall-alarm 0.5s infinite alternate;
+        }
+
+        /* Bottom instruction text */
+        #instructions {
+            padding: 10px;
+            text-align: center;
+            font-size: 0.85rem;
+            letter-spacing: 3px;
+            color: var(--primary-dim);
+            background: rgba(8, 11, 16, 0.95);
+            border-top: 1px solid rgba(0, 255, 102, 0.15);
+            text-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
+            text-transform: uppercase;
+        }
+
+        /* Screens overlays base styling */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(6, 8, 12, 0.97);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            padding: 30px;
+            text-align: center;
+            border-radius: 5px;
+        }
+
+        .screen h1 {
+            font-family: 'VT323', monospace;
+            font-size: 4.5rem;
+            margin: 0 0 5px 0;
+            color: var(--primary);
+            text-shadow: var(--text-glow);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .screen h2 {
+            font-size: 1.15rem;
+            color: var(--secondary);
+            margin: 0 0 35px 0;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            text-shadow: var(--cyan-glow);
+        }
+
+        /* Startup Diagnostics log layout */
+        .terminal-startup {
+            width: 100%;
+            max-width: 480px;
+            background: rgba(12, 17, 24, 0.85);
+            border: 1px solid var(--primary-dim);
+            border-radius: 4px;
+            padding: 15px 20px;
+            margin-bottom: 35px;
+            text-align: left;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .terminal-startup .line {
+            margin: 6px 0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: var(--primary-dim);
+            overflow: hidden;
+            white-space: nowrap;
+            letter-spacing: 1px;
+        }
+
+        .terminal-startup .line:last-child {
+            color: var(--warning);
+            text-shadow: 0 0 5px rgba(255, 170, 0, 0.4);
+        }
+
+        /* Cyberpunk Button Styling */
+        button {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.15rem;
+            font-weight: bold;
+            color: var(--primary);
+            background: transparent;
+            border: 2px solid var(--primary);
+            padding: 14px 36px;
+            cursor: pointer;
+            text-shadow: var(--text-glow);
+            box-shadow: 0 0 12px rgba(0, 255, 102, 0.15);
+            transition: all 0.25s ease;
+            position: relative;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            outline: none;
+            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 102, 0.15), transparent);
+            transition: 0.5s;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        button:hover {
+            background: var(--primary);
+            color: var(--bg);
+            box-shadow: 0 0 25px var(--primary);
+            text-shadow: none;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Falling Words styling */
+        .word {
+            position: absolute;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: bold;
+            letter-spacing: 1.5px;
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 255, 102, 0.2);
+            background: rgba(8, 12, 18, 0.88);
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+            white-space: nowrap;
+            pointer-events: none;
+            transform-origin: center;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+            z-index: 3;
+        }
+
+        /* Word Inner Structure */
+        .word-inner {
+            display: flex;
+            align-items: center;
+        }
+
+        .typed {
+            color: var(--secondary);
+            text-shadow: var(--cyan-glow);
+            font-weight: bold;
+        }
+
+        .untyped {
+            color: var(--primary);
+            opacity: 0.75;
+            text-shadow: var(--text-glow);
+        }
+
+        /* Locked-on Targeted Word Reticle */
+        .word.targeted {
+            border-color: var(--secondary);
+            background: rgba(10, 20, 32, 0.95);
+            box-shadow: 
+                0 0 20px rgba(0, 240, 255, 0.35),
+                inset 0 0 8px rgba(0, 240, 255, 0.15);
+            z-index: 5;
+            animation: target-pulse 0.3s ease-out;
+        }
+
+        /* Add dynamic crosshair lines around the targeted word */
+        .word.targeted::before {
+            content: '[';
+            color: var(--secondary);
+            margin-right: 4px;
+            text-shadow: var(--cyan-glow);
+            font-size: 1.35rem;
+        }
+
+        .word.targeted::after {
+            content: ']';
+            color: var(--secondary);
+            margin-left: 4px;
+            text-shadow: var(--cyan-glow);
+            font-size: 1.35rem;
+            animation: target-blink 0.8s infinite;
+        }
+
+        /* Exploding particle styling */
+        .particle {
+            position: absolute;
+            background: var(--secondary);
+            border-radius: 50%;
+            pointer-events: none;
+            box-shadow: var(--cyan-glow);
+            z-index: 4;
+        }
+
+        /* Floating Score layout */
+        .floating-score {
+            position: absolute;
+            font-family: 'VT323', monospace;
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: var(--secondary);
+            text-shadow: var(--cyan-glow);
+            pointer-events: none;
+            z-index: 4;
+            transform: translate3d(-50%, -50%, 0);
+            animation: float-up-fade 0.8s forwards cubic-bezier(0.1, 0.8, 0.3, 1);
+        }
+
+        /* Game Over screen components */
+        .breached-title {
+            color: var(--danger) !important;
+            text-shadow: var(--red-glow) !important;
+            animation: text-glitch-active 1.5s infinite;
+        }
+
+        .final-score-container {
+            background: rgba(20, 10, 15, 0.95);
+            border: 1px solid rgba(255, 51, 102, 0.3);
+            border-radius: 4px;
+            padding: 20px 40px;
+            margin-bottom: 40px;
+            min-width: 300px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .final-score-container div {
+            margin: 10px 0;
+            font-size: 1.4rem;
+            letter-spacing: 1.5px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .final-score-container #final-score {
+            color: var(--secondary);
+            font-weight: bold;
+            text-shadow: var(--cyan-glow);
+        }
+
+        .final-score-container #final-highscore {
+            color: var(--warning);
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(255, 170, 0, 0.5);
+        }
+
+        /* Keyframes Animations */
+        @keyframes crt-flicker {
+            0% { opacity: 0.993; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes scanline-roll {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes target-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes target-blink {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes float-up-fade {
+            0% { transform: translate3d(-50%, -50%, 0) scale(0.8); opacity: 1; }
+            50% { transform: translate3d(-50%, -60px, 0) scale(1.25); opacity: 1; }
+            100% { transform: translate3d(-50%, -120px, 0) scale(0.9); opacity: 0; }
+        }
+
+        @keyframes hud-flash {
+            0% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes firewall-alarm {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes text-glitch-active {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(2px, -2px); }
+            60% { transform: translate(-1px, -1px); }
+            80% { transform: translate(1px, 2px); }
+        }
+
+        /* Glitch header effect for Boot Screen */
+        .glitch-wrapper {
+            position: relative;
+        }
+        
+        .glitch {
+            position: relative;
+        }
+
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg);
+        }
+
+        .glitch::before {
+            left: 2px;
+            text-shadow: -2px 0 var(--secondary);
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim 5s infinite linear alternate-reverse;
+        }
+
+        .glitch::after {
+            left: -2px;
+            text-shadow: -2px 0 var(--danger), 0 2px var(--secondary);
+            clip: rect(85px, 450px, 140px, 0);
+            animation: glitch-anim2 5s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(15px, 9999px, 66px, 0); }
+            10% { clip: rect(34px, 9999px, 55px, 0); }
+            20% { clip: rect(78px, 9999px, 80px, 0); }
+            30% { clip: rect(44px, 9999px, 12px, 0); }
+            40% { clip: rect(98px, 9999px, 43px, 0); }
+            50% { clip: rect(55px, 9999px, 90px, 0); }
+            60% { clip: rect(10px, 9999px, 120px, 0); }
+            70% { clip: rect(66px, 9999px, 34px, 0); }
+            80% { clip: rect(12px, 9999px, 89px, 0); }
+            90% { clip: rect(43px, 9999px, 78px, 0); }
+            100% { clip: rect(90px, 9999px, 55px, 0); }
+        }
+
+        @keyframes glitch-anim2 {
+            0% { clip: rect(85px, 9999px, 140px, 0); }
+            10% { clip: rect(24px, 9999px, 65px, 0); }
+            20% { clip: rect(12px, 9999px, 45px, 0); }
+            30% { clip: rect(67px, 9999px, 98px, 0); }
+            40% { clip: rect(34px, 9999px, 12px, 0); }
+            50% { clip: rect(89px, 9999px, 120px, 0); }
+            60% { clip: rect(56px, 9999px, 34px, 0); }
+            70% { clip: rect(10px, 9999px, 55px, 0); }
+            80% { clip: rect(78px, 9999px, 90px, 0); }
+            90% { clip: rect(43px, 9999px, 12px, 0); }
+            100% { clip: rect(12px, 9999px, 80px, 0); }
+        }
+
+        /* Screen hidden utility */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive scaling adjustment */
+        @media (max-width: 768px) {
+            #hud {
+                grid-template-columns: 1fr 1fr;
+                font-size: 0.85rem;
+                padding: 10px 15px;
+            }
+            .mute-btn {
+                grid-column: span 2;
+                justify-self: center;
+                margin-top: 5px;
+            }
+            .screen h1 {
+                font-size: 2.8rem;
+            }
+            .screen h2 {
+                font-size: 0.95rem;
+                letter-spacing: 3px;
+            }
+            .final-score-container {
+                padding: 15px 20px;
+                min-width: auto;
+                width: 100%;
+            }
+            button {
+                padding: 12px 24px;
+                font-size: 1rem;
+            }
+            .word {
+                font-size: 1.05rem;
+                padding: 4px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="monitor-wrapper">
+    <div class="monitor-screen">
+        <div id="crt-overlay"></div>
+        <div id="flash-overlay"></div>
+        
+        <div id="game-container">
+            <div id="hud">
+                <div>SCORE: <span id="hud-score">0</span></div>
+                <div>INTEGRITY: <span id="hud-integrity">███</span></div>
+                <div>LEVEL: <span id="hud-level">1</span></div>
+                <div>HIGH SCORE: <span id="hud-highscore">0</span></div>
+                <div class="mute-btn" onclick="toggleMute()" id="mute-btn"><span id="mute-icon">🔊</span> AUDIO</div>
+            </div>
+            
+            <div id="arena"></div>
+            
+            <div id="instructions">
+                TYPE VISIBLE WORDS TO DESTROY THEM • PRESS ESC TO PAUSE
+            </div>
+        </div>
+        
+        <div id="boot-screen" class="screen">
+            <div class="glitch-wrapper">
+                <h1 class="glitch" data-text="KEYSTROKE DEFENDER">KEYSTROKE DEFENDER</h1>
+            </div>
+            <h2>SYSTEM SECURITY CORE</h2>
+            <div class="terminal-startup">
+                <div class="line">> LOADING SECURE MAIN CORE... SUCCESS</div>
+                <div class="line">> INITIALIZING FIREWALL SYSTEMS... ONLINE</div>
+                <div class="line">> INTRUSION DETECTION ENGINE... MONITORING</div>
+                <div class="line">> WARNING: THREAT DETECTED - INCOMING PACKETS IDENTIFIED</div>
+            </div>
+            <button onclick="startGame()">INITIALIZE DEFENSE</button>
+        </div>
+        
+        <div id="pause-screen" class="screen hidden">
+            <h1>SYSTEM PAUSED</h1>
+            <h2>DEFENSE SEQUENCE SUSPENDED</h2>
+            <div class="terminal-startup">
+                <div class="line">> DEFENSE LOOP HALTED...</div>
+                <div class="line">> SYSTEM STATUS: STANDBY</div>
+                <div class="line">> PRESS ESCAPE OR CLICK RESUME TO RE-ENGAGE</div>
+            </div>
+            <button onclick="resumeGame()">RESUME</button>
+        </div>
+        
+        <div id="game-over-screen" class="screen hidden">
+            <h1 class="breached-title">SYSTEM BREACHED</h1>
+            <div class="final-score-container">
+                <div>FINAL SCORE: <span id="final-score">0</span></div>
+                <div>HIGH SCORE: <span id="final-highscore">0</span></div>
+            </div>
+            <button onclick="startGame()">REBOOT SYSTEM</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DICTIONARY = [
+        "ROUTER", "SWITCH", "PACKET", "LATENCY", "BANDWIDTH", "FIREWALL", "SUBNET", "GATEWAY", "PROTOCOL", "TCP", "UDP", "DNS", "DHCP", "VPN", "MAC", "BGP", "VLAN", "PROXY", "SOCKET",
+        "ENCRYPTION", "DECRYPTION", "CIPHER", "HASH", "MALWARE", "RANSOMWARE", "PHISHING", "TROJAN", "ROOTKIT", "SPYWARE", "BOTNET", "PAYLOAD", "EXPLOIT", "VULNERABILITY", "PATCH", "ZERODAY", "AUTHENTICATION", "AUTHORIZATION", "TOKEN", "CERTIFICATE", "PENETRATION", "KEYLOGGER",
+        "VARIABLE", "FUNCTION", "CLASS", "OBJECT", "ARRAY", "STRING", "INTEGER", "BOOLEAN", "LOOP", "ITERATION", "RECURSION", "POINTER", "REFERENCE", "COMPILER", "INTERPRETER", "SYNTAX", "ALGORITHM", "HEURISTIC", "POLYMORPHISM", "ENCAPSULATION", "INHERITANCE", "DEBUGGING", "REFACTORING", "DEPLOYMENT", "REPOSITORY", "COMMIT", "MERGE", "BRANCH",
+        "KERNEL", "PROCESS", "THREAD", "MEMORY", "PAGE", "SWAP", "SCHEDULER", "DAEMON", "SHELL", "TERMINAL", "FILESYSTEM", "DIRECTORY", "MOUNT", "SYMLINK", "PERMISSIONS", "ROOT", "SUDO", "BASH", "ZSH", "CRON",
+        "DATABASE", "TABLE", "ROW", "COLUMN", "INDEX", "QUERY", "TRANSACTION", "ROLLBACK", "SCHEMA", "RELATION", "JOIN", "FOREIGNKEY", "PRIMARYKEY", "NORMALIZATION", "NOSQL", "MONGO", "REDIS", "POSTGRES", "MYSQL", "SQLITE", "CASSANDRA",
+        "CLOUD", "CONTAINER", "DOCKER", "KUBERNETES", "POD", "NODE", "CLUSTER", "SERVERLESS", "LAMBDA", "MICROSERVICE", "VIRTUALIZATION", "HYPERVISOR", "TENANT", "INSTANCE", "ELASTIC", "SCALABILITY", "PROVISIONING", "ORCHESTRATION",
+        "PROCESSOR", "MOTHERBOARD", "GRAPHICS", "CHIPSET", "TRANSISTOR", "REGISTER", "CACHE", "HEATSINK", "OVERCLOCK", "FIRMWARE", "BIOS", "UEFI", "PERIPHERAL", "STORAGE",
+        "NEURAL", "NETWORK", "TRAINING", "INFERENCE", "DATASET", "WEIGHT", "BIAS", "ACTIVATION", "BACKPROPAGATION", "GRADIENT", "DESCENT", "EPOCH", "BATCH", "TENSOR", "TRANSFORMER", "ATTENTION", "CONVOLUTION", "RECURRENT",
+        "FRONTEND", "BACKEND", "FULLSTACK", "DOM", "HTML", "CSS", "JAVASCRIPT", "FRAMEWORK", "LIBRARY", "COMPONENT", "STATE", "PROPS", "HOOK", "MIDDLEWARE", "ENDPOINT", "API", "REST", "GRAPHQL", "WEBHOOK", "WEBSOCKET", "SESSION", "COOKIE"
+    ];
+    
+    const UNIQUE_DICTIONARY = Array.from(new Set(DICTIONARY));
+
+    let state = 'BOOT'; 
+    let score = 0;
+    let integrity = 3;
+    const maxIntegrity = 3;
+    let level = 1;
+    let highScore = parseInt(localStorage.getItem('keystroke_highscore')) || 0;
+    
+    let words = [];
+    let targetWord = null;
+    
+    let lastTime = 0;
+    let spawnTimer = 0;
+    let spawnInterval = 1500;
+    let speedMult = 1;
+    let reqId;
+
+    const arena = document.getElementById('arena');
+    let audioCtx;
+    let isMuted = false;
+
+    document.getElementById('hud-highscore').innerText = highScore;
+
+    function initAudio() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function playSound(type) {
+        if (isMuted || !audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        const t = audioCtx.currentTime;
+        gain.gain.setValueAtTime(0, t);
+        
+        switch (type) {
+            case 'correct':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, t);
+                osc.frequency.exponentialRampToValueAtTime(1200, t + 0.05);
+                gain.gain.linearRampToValueAtTime(0.1, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+                osc.start(t);
+                osc.stop(t + 0.1);
+                break;
+            case 'error':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, t);
+                gain.gain.linearRampToValueAtTime(0.1, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+                osc.start(t);
+                osc.stop(t + 0.15);
+                break;
+            case 'destroy':
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, t);
+                osc.frequency.exponentialRampToValueAtTime(100, t + 0.2);
+                gain.gain.linearRampToValueAtTime(0.1, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                osc.start(t);
+                osc.stop(t + 0.2);
+                break;
+            case 'damage':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, t);
+                osc.frequency.exponentialRampToValueAtTime(50, t + 0.3);
+                gain.gain.linearRampToValueAtTime(0.2, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                osc.start(t);
+                osc.stop(t + 0.3);
+                break;
+            case 'gameover':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, t);
+                osc.frequency.exponentialRampToValueAtTime(50, t + 1.0);
+                gain.gain.linearRampToValueAtTime(0.2, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+                osc.start(t);
+                osc.stop(t + 1.0);
+                break;
+        }
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        document.getElementById('mute-icon').innerText = isMuted ? '🔇' : '🔊';
+    }
+
+    function startGame() {
+        if (state === 'PLAYING') return;
+        initAudio();
+        
+        document.getElementById('boot-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('pause-screen').classList.add('hidden');
+        
+        arena.innerHTML = '';
+        words = [];
+        targetWord = null;
+        
+        score = 0;
+        integrity = maxIntegrity;
+        level = 1;
+        speedMult = 1;
+        spawnInterval = 1500;
+        spawnTimer = spawnInterval;
+        
+        updateHUD();
+        
+        state = 'PLAYING';
+        lastTime = performance.now();
+        if (reqId) cancelAnimationFrame(reqId);
+        reqId = requestAnimationFrame(update);
+    }
+
+    function pauseGame() {
+        state = 'PAUSED';
+        document.getElementById('pause-screen').classList.remove('hidden');
+    }
+
+    function resumeGame() {
+        state = 'PLAYING';
+        document.getElementById('pause-screen').classList.add('hidden');
+        lastTime = performance.now();
+        reqId = requestAnimationFrame(update);
+    }
+
+    function gameOver() {
+        state = 'GAMEOVER';
+        playSound('gameover');
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('keystroke_highscore', highScore);
+        }
+        
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('final-highscore').innerText = highScore;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+        updateHUD();
+    }
+
+    function updateHUD() {
+        document.getElementById('hud-score').innerText = score;
+        document.getElementById('hud-highscore').innerText = highScore;
+        document.getElementById('hud-level').innerText = level;
+        
+        const integrityEl = document.getElementById('hud-integrity');
+        const current = Math.max(0, integrity);
+        integrityEl.innerText = '█'.repeat(current) + '░'.repeat(maxIntegrity - current);
+        
+        if (current === 1 && state === 'PLAYING') {
+            integrityEl.classList.add('danger');
+            arena.classList.add('danger');
+        } else {
+            integrityEl.classList.remove('danger');
+            arena.classList.remove('danger');
+        }
+    }
+
+    function triggerFlash() {
+        const overlay = document.getElementById('flash-overlay');
+        overlay.style.opacity = '0.4';
+        setTimeout(() => { overlay.style.opacity = '0'; }, 50);
+    }
+
+    function spawnWord() {
+        const text = UNIQUE_DICTIONARY[Math.floor(Math.random() * UNIQUE_DICTIONARY.length)];
+        const el = document.createElement('div');
+        el.className = 'word';
+        arena.appendChild(el);
+        
+        const width = el.getBoundingClientRect().width || (text.length * 15);
+        const x = Math.random() * (arena.clientWidth - width - 20) + 10;
+        const y = -40;
+        
+        const baseSpeed = 40 + Math.random() * 40; 
+        const speed = baseSpeed * speedMult;
+        
+        const w = { 
+            id: Date.now() + Math.random(), 
+            text: text, 
+            x: x, 
+            y: y, 
+            speed: speed, 
+            element: el, 
+            typedLength: 0, 
+            isTargeted: false 
+        };
+        
+        updateWordElement(w);
+        words.push(w);
+    }
+
+    function updateWordElement(w) {
+        const typed = w.text.substring(0, w.typedLength);
+        const untyped = w.text.substring(w.typedLength);
+        w.element.innerHTML = `<span class="word-inner"><span class="typed">${typed}</span><span class="untyped">${untyped}</span></span>`;
+        if (w.isTargeted) {
+            w.element.classList.add('targeted');
+        } else {
+            w.element.classList.remove('targeted');
+        }
+    }
+
+    function destroyWord(w) {
+        playSound('destroy');
+        const pts = w.text.length * 10;
+        score += pts;
+        
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('keystroke_highscore', highScore);
+        }
+        
+        const newLevel = Math.floor(score / 200) + 1;
+        if (newLevel > level) {
+            level = newLevel;
+            speedMult = 1 + (level - 1) * 0.1;
+            spawnInterval = Math.max(500, 1500 - (level - 1) * 100);
+        }
+        
+        updateHUD();
+        
+        const rect = w.element.getBoundingClientRect();
+        const arenaRect = arena.getBoundingClientRect();
+        const px = rect.left - arenaRect.left + rect.width / 2;
+        const py = rect.top - arenaRect.top + rect.height / 2;
+        
+        spawnFloatingScore(px, py, pts);
+        createExplosion(px, py);
+        
+        w.element.remove();
+        words = words.filter(word => word !== w);
+        targetWord = null;
+    }
+
+    function createExplosion(x, y) {
+        for (let i = 0; i < 12; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            arena.appendChild(p);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 80 + 50;
+            const size = Math.random() * 5 + 3;
+            
+            p.style.width = size + 'px';
+            p.style.height = size + 'px';
+            p.style.left = x + 'px';
+            p.style.top = y + 'px';
+            
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            const startTime = Date.now();
+            const duration = 0.5;
+            
+            function animateParticle() {
+                if (state !== 'PLAYING') {
+                    p.remove();
+                    return;
+                }
+                const dt = (Date.now() - startTime) / 1000;
+                if (dt > duration) {
+                    p.remove();
+                    return;
+                }
+                p.style.transform = `translate3d(${vx * dt}px, ${vy * dt}px, 0)`;
+                p.style.opacity = 1 - (dt / duration);
+                requestAnimationFrame(animateParticle);
+            }
+            requestAnimationFrame(animateParticle);
+        }
+    }
+
+    function spawnFloatingScore(x, y, pts) {
+        const el = document.createElement('div');
+        el.className = 'floating-score';
+        el.innerText = '+' + pts;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        arena.appendChild(el);
+        setTimeout(() => { if(el.parentNode) el.remove(); }, 1000);
+    }
+
+    function update(time) {
+        if (state !== 'PLAYING') return;
+        
+        let dt = (time - lastTime) / 1000;
+        if (dt > 0.1) dt = 0.1;
+        lastTime = time;
+
+        spawnTimer -= dt * 1000;
+        if (spawnTimer <= 0) {
+            spawnWord();
+            spawnTimer = spawnInterval;
+        }
+
+        let damageTaken = 0;
+        for (let i = words.length - 1; i >= 0; i--) {
+            const w = words[i];
+            w.y += w.speed * dt;
+            w.element.style.transform = `translate3d(${w.x}px, ${w.y}px, 0)`;
+
+            if (w.y > arena.clientHeight) {
+                damageTaken++;
+                if (w === targetWord) targetWord = null;
+                w.element.remove();
+                words.splice(i, 1);
+            }
+        }
+
+        if (damageTaken > 0) {
+            integrity -= damageTaken;
+            updateHUD();
+            triggerFlash();
+            playSound('damage');
+            if (integrity <= 0) {
+                gameOver();
+            }
+        }
+
+        if (state === 'PLAYING') {
+            reqId = requestAnimationFrame(update);
+        }
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        
+        if (e.key === 'Escape') {
+            if (state === 'PLAYING') pauseGame();
+            else if (state === 'PAUSED') resumeGame();
+            return;
+        }
+
+        if (state !== 'PLAYING') return;
+        
+        const key = e.key.toUpperCase();
+        if (/^[A-Z]$/.test(key)) {
+            e.preventDefault();
+
+            if (targetWord) {
+                if (targetWord.text[targetWord.typedLength] === key) {
+                    targetWord.typedLength++;
+                    playSound('correct');
+                    updateWordElement(targetWord);
+                    if (targetWord.typedLength === targetWord.text.length) {
+                        destroyWord(targetWord);
+                    }
+                } else {
+                    targetWord.isTargeted = false;
+                    targetWord.typedLength = 0;
+                    updateWordElement(targetWord);
+                    targetWord = null;
+                    playSound('error');
+                }
+            } else {
+                let candidates = words.filter(w => w.text[0] === key);
+                if (candidates.length > 0) {
+                    candidates.sort((a, b) => b.y - a.y);
+                    targetWord = candidates[0];
+                    targetWord.isTargeted = true;
+                    targetWord.typedLength = 1;
+                    playSound('correct');
+                    updateWordElement(targetWord);
+                    if (targetWord.typedLength === targetWord.text.length) {
+                        destroyWord(targetWord);
+                    }
+                } else {
+                    playSound('error');
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>
